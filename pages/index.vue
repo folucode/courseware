@@ -67,7 +67,7 @@ import { Account, Client, Functions } from 'appwrite';
 
 const client = new Client()
   .setEndpoint('https://cloud.appwrite.io/v1')
-  .setProject('656e2623692ca72a1ee2');
+  .setProject('[PROJECT-ID]');
 
 const account = new Account(client);
 
@@ -117,7 +117,7 @@ export default {
     async buyCourse() {
       try {
         const execution = await functions.createExecution(
-          '656e272faecc379fdcbb',
+          '[FUNCTION-ID]',
           JSON.stringify({
             failureUrl: window.location.href,
             successUrl: window.location.href,
