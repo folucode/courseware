@@ -1,6 +1,6 @@
 <template>
   <div>
-    <div v-if="authUser === false" class="section">
+    <div v-if="authUser === null" class="section">
       <p>
         Only registered users can create subscriptions.
       </p>
@@ -10,17 +10,16 @@
       </button>
     </div>
 
-    <div v-if="authUser">
+    <div v-if="authUser !== null">
       <button @click="signOut()" class="sign-out">
         <span>Sign out</span>
       </button>
 
-      <CourseList :courses="courses" :buyCourse="buyCourse" v-if="!authUser.labels.includes('subscriber')"
-        class="section" />
-
-      <div v-if="authUser.labels.includes('subscriber')">
-        <CoursePage :course="courses[0]" class="section" />
+      <div>
+        <CourseList v-if="courses === null" :buyCourse="buyCourse" class="section" />
+        <CoursePage v-else :course="courses[0]" class="section" />
       </div>
+
     </div>
   </div>
 </template>
@@ -63,7 +62,7 @@ button:hover {
 </style>
 
 <script>
-import { Account, Client, Functions } from 'appwrite';
+import { Account, Client, Databases, Functions } from 'appwrite';
 
 const client = new Client()
   .setEndpoint('https://cloud.appwrite.io/v1')
@@ -73,46 +72,39 @@ const account = new Account(client);
 
 const functions = new Functions(client)
 
+const databases = new Databases(client)
+
 export default {
   name: 'IndexPage',
   data() {
     return {
       authUser: null,
-      courses: [
-        {
-          name: "Introduction to JavaScript",
-          description: "Embark on a comprehensive journey to grasp the fundamental concepts of the JavaScript programming language. This engaging learning experience is tailored for beginners, offering a step-by-step exploration of key JavaScript principles, syntax, and functionalities. Discover the power of JavaScript as a versatile scripting language widely employed for both front-end and back-end web development.",
-          tutor: "John Doe",
-          price: 10
-        },
-      ],
+      courses: null,
     };
   },
-  async mounted() {
-    await this.loadAuthUser();
-  },
-  watch: {
-    authUser: {
-      immediate: true,
-      handler: 'loadAuthUser',
-    },
+  mounted() {
+    this.checkAnonymousSession();
+    this.loadCourses();
   },
   methods: {
-    async loadAuthUser() {
+    async checkAnonymousSession() {
       try {
-        this.authUser = await account.get();
-      } catch (err) {
-        console.warn(err, this.authUser);
-        this.authUser = false;
+        const anonymousSession = await account.get();
+
+        if (anonymousSession) {
+          this.authUser = anonymousSession;
+        }
+      } catch (error) {
+        console.error('Error checking anonymous session:', error.message);
       }
     },
     async register() {
-      await account.createAnonymousSession();
-      await this.loadAuthUser();
+      const user = await account.createAnonymousSession();
+      this.authUser = user
     },
     async signOut() {
       await account.deleteSession('current');
-      this.authUser = false;
+      this.authUser = null;
     },
     async buyCourse() {
       try {
@@ -129,6 +121,7 @@ export default {
             'Content-Type': 'application/json',
           }
         );
+
         const url =
           execution.responseHeaders.find(
             (header) => header.name === 'location'
@@ -139,6 +132,21 @@ export default {
         console.error('Error fetching courses', error);
       }
     },
+    async loadCourses() {
+      try {
+        const courses = await databases.listDocuments(
+          "[DATABASE-ID]",
+          "[COLLECTION-ID]",
+        )
+
+        if (courses.total > 0) {
+          this.courses = courses.documents
+        }
+      } catch (error) {
+        console.log(error);
+      }
+
+    }
   }
 }
 </script>
